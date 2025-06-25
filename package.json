@@ -1,0 +1,101 @@
+{
+  "name": "payslip-generation-system",
+  "version": "1.0.0",
+  "description": "A scalable payslip generation system built with Node.js, Express, and PostgreSQL",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "NODE_ENV=test jest",
+    "test:unit": "NODE_ENV=test jest --testPathPattern=tests/unit",
+    "test:integration": "NODE_ENV=test jest --testPathPattern=tests/integration",
+    "test:e2e": "NODE_ENV=test jest --testPathPattern=tests/e2e",
+    "test:watch": "NODE_ENV=test jest --watch",
+    "test:coverage": "NODE_ENV=test jest --coverage",
+    "migrate": "node src/migrations/migrate.js",
+    "migrate:create": "node src/migrations/create.js",
+    "seed": "node src/seeds/index.js",
+    "db:backup": "node scripts/backup.js",
+    "db:restore": "node scripts/restore.js",
+    "lint": "eslint src/ tests/",
+    "lint:fix": "eslint src/ tests/ --fix",
+    "build": "echo 'No build step required for Node.js'",
+    "docker:build": "docker build -t payslip-system .",
+    "docker:run": "docker-compose up",
+    "docker:down": "docker-compose down"
+  },
+  "keywords": [
+    "payslip",
+    "payroll",
+    "attendance",
+    "overtime",
+    "employee-management",
+    "nodejs",
+    "express",
+    "postgresql"
+  ],
+  "author": "amaralkaff",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "joi": "^17.11.0",
+    "winston": "^3.11.0",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "express-rate-limit": "^7.1.5",
+    "compression": "^1.7.4",
+    "dotenv": "^16.3.1",
+    "uuid": "^9.0.1",
+    "date-fns": "^2.30.0",
+    "express-validator": "^7.0.1",
+    "morgan": "^1.10.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "nodemon": "^3.0.2",
+    "eslint": "^8.55.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-jest": "^27.6.0",
+    "eslint-plugin-node": "^11.1.0",
+    "@types/jest": "^29.5.8",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amaralkaff/technical-test-dealls"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/migrations/**",
+      "!src/seeds/**",
+      "!src/server.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": ["text", "lcov", "html"],
+    "testTimeout": 10000,
+    "maxWorkers": "50%"
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "jest --bail --findRelatedTests"
+    ]
+  }
+} 

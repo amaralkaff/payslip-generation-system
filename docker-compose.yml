@@ -1,0 +1,163 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: payslip_postgres
+    environment:
+      POSTGRES_DB: payslip_system
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - payslip_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d payslip_system"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test Database (Optional)
+  postgres_test:
+    image: postgres:15-alpine
+    container_name: payslip_postgres_test
+    environment:
+      POSTGRES_DB: payslip_system_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    networks:
+      - payslip_network
+    profiles:
+      - testing
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d payslip_system_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Node.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: payslip_app
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: payslip_system
+      DB_USER: postgres
+      DB_PASSWORD: password123
+      JWT_SECRET: your_development_jwt_secret_here_change_in_production
+      PORT: 3000
+      HOST: 0.0.0.0
+      LOG_LEVEL: debug
+      API_DOCS_ENABLED: true
+    ports:
+      - "3000:3000"
+      - "9229:9229" # Node.js debugger port
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - ./logs:/app/logs
+    networks:
+      - payslip_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    command: npm run dev
+
+  # Redis (Optional - for caching and session management)
+  redis:
+    image: redis:7-alpine
+    container_name: payslip_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - payslip_network
+    profiles:
+      - caching
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # Nginx (Production proxy)
+  nginx:
+    image: nginx:alpine
+    container_name: payslip_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./logs/nginx:/var/log/nginx
+    networks:
+      - payslip_network
+    depends_on:
+      - app
+    profiles:
+      - production
+    restart: unless-stopped
+
+  # pgAdmin (Database management interface)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: payslip_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@payslip.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - payslip_network
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  postgres_test_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  node_modules:
+    driver: local
+
+networks:
+  payslip_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 

@@ -1,31 +1,3 @@
-# AI Generated Files and Folders
-# ====================================
-# Claude Code generated files
-.claude/
-claude-artifacts/
-claude-sessions/
-claude-cache/
-CLAUDE.md
-
-# AI-generated specification folders
-spec/
-specifications/
-docs/spec/
-
-# Other AI tools
-.cursor/
-.copilot/
-.github/copilot-*
-.ai-generated/
-ai-output/
-generated/
-
-# AI conversation logs
-*.ai-log
-*.claude-log
-*.copilot-log
-conversation-*.md
-
 # Node.js
 # ====================================
 # Dependencies
@@ -303,3 +275,31 @@ dump.rdb
 # System files
 .DS_Store
 Thumbs.db
+
+# AI Generated Files and Folders
+# ====================================
+# Claude Code generated files
+.claude/
+claude-artifacts/
+claude-sessions/
+claude-cache/
+CLAUDE.md
+
+# AI-generated specification folders
+spec/
+specifications/
+docs/spec/
+
+# Other AI tools
+.cursor/
+.copilot/
+.github/copilot-*
+.ai-generated/
+ai-output/
+generated/
+
+# AI conversation logs
+*.ai-log
+*.claude-log
+*.copilot-log
+conversation-*.md
