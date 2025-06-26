@@ -38,15 +38,6 @@ open http://localhost:3000/api-docs
 5. **Enter token**: Type `Bearer <your-jwt-token>` (include "Bearer " prefix)
 6. **Test APIs**: All endpoints now have **auto-placeholder values** - just click "Execute"!
 
-**Step-by-step Authorization:**
-```
-1. POST /api/v1/auth/login → Auto-filled with admin/admin123
-2. Click "Authorize" button in Swagger UI
-3. Enter: Bearer <token-from-step-1>
-4. Click "Authorize" 
-5. Test any endpoint - all forms auto-populated!
-```
-
 ## **API Usage Guide**
 
 ### **1. Authentication**
