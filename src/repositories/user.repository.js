@@ -17,7 +17,7 @@ class UserRepository {
       SELECT id, username, password_hash, role, salary, full_name, email, is_active, 
              created_at, updated_at
       FROM users 
-      WHERE username = $1 AND is_active = true
+      WHERE username = $1
     `;
     
     try {

@@ -359,6 +359,81 @@ class PayrollService {
       throw error;
     }
   }
+
+  /**
+   * Calculate prorated salary based on attendance
+   * @param {number} baseSalary - Base monthly salary
+   * @param {Object} attendanceData - Attendance data
+   * @returns {Object} Prorated salary calculation
+   */
+  static calculateProratedSalary(baseSalary, attendanceData) {
+    if (baseSalary < 0) {
+      throw new Error('Salary must be a positive number');
+    }
+    
+    if (attendanceData.attendanceDays < 0) {
+      throw new Error('Attendance days cannot be negative');
+    }
+    
+    if (attendanceData.totalWorkingDays <= 0) {
+      throw new Error('Total working days must be greater than zero');
+    }
+
+    const attendanceRate = Math.min(
+      attendanceData.attendanceDays / attendanceData.totalWorkingDays,
+      1.0
+    );
+    
+    const proratedSalary = baseSalary * attendanceRate;
+
+    return {
+      proratedSalary: parseFloat(proratedSalary.toFixed(2)),
+      attendanceRate: parseFloat(attendanceRate.toFixed(3)),
+      attendanceDays: attendanceData.attendanceDays,
+      totalWorkingDays: attendanceData.totalWorkingDays
+    };
+  }
+
+  /**
+   * Calculate overtime amount at 2x rate
+   * @param {number} baseSalary - Base monthly salary
+   * @param {number} totalWorkingDays - Total working days in period
+   * @param {number} overtimeHours - Total overtime hours
+   * @returns {Object} Overtime calculation
+   */
+  static calculateOvertimeAmount(baseSalary, totalWorkingDays, overtimeHours) {
+    const hourlyRate = baseSalary / (totalWorkingDays * 8);
+    const overtimeRate = hourlyRate * 2;
+    const overtimeAmount = overtimeHours * overtimeRate;
+
+    return {
+      overtimeAmount: parseFloat(overtimeAmount.toFixed(2)),
+      overtimeRate: parseFloat(overtimeRate.toFixed(2)),
+      overtimeHours: overtimeHours
+    };
+  }
+
+  /**
+   * Calculate net pay from components
+   * @param {Object} components - Pay components
+   * @returns {Object} Net pay calculation
+   */
+  static calculateNetPay(components) {
+    const { proratedSalary, overtimeAmount, reimbursementAmount } = components;
+    const netPay = proratedSalary + overtimeAmount + reimbursementAmount;
+
+    return {
+      netPay: parseFloat(netPay.toFixed(2)),
+      breakdown: {
+        base_salary: parseFloat(proratedSalary.toFixed(2)),
+        overtime_amount: parseFloat(overtimeAmount.toFixed(2)),
+        reimbursement_amount: parseFloat(reimbursementAmount.toFixed(2)),
+        total: parseFloat(netPay.toFixed(2))
+      }
+    };
+  }
 }
 
-module.exports = new PayrollService(); 
+const payrollServiceInstance = new PayrollService();
+payrollServiceInstance.PayrollService = PayrollService; // Expose class for static methods
+module.exports = payrollServiceInstance; 

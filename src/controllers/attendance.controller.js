@@ -190,7 +190,122 @@ class AttendanceController {
         });
       }
 
+      // Validate date formats
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(start_date) || !dateRegex.test(end_date)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_DATE_FORMAT',
+            message: 'Dates must be in YYYY-MM-DD format'
+          },
+          request_id: req.id
+        });
+      }
+
+      // Validate dates are actual valid dates
+      const startDate = new Date(start_date);
+      const endDate = new Date(end_date);
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_DATE_FORMAT',
+            message: 'Invalid date values provided'
+          },
+          request_id: req.id
+        });
+      }
+
       const result = await attendanceService.calculateWorkingDays(start_date, end_date);
+
+      res.status(200).json({
+        success: true,
+        data: result.data,
+        request_id: req.id
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ===== ADMIN METHODS =====
+
+  /**
+   * Get all attendance records for a period (Admin only)
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next function
+   */
+  async getAttendanceForPeriod(req, res, next) {
+    try {
+      const { periodId } = req.params;
+      const { page, limit, userId } = req.query;
+      
+      const options = {
+        page: page ? parseInt(page) : 1,
+        limit: limit ? parseInt(limit) : 50,
+        userId: userId || undefined
+      };
+
+      const result = await attendanceService.getAttendanceForPeriod(parseInt(periodId), options);
+
+      res.status(200).json({
+        success: true,
+        data: result.data,
+        request_id: req.id
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get attendance summary for a period (Admin only)
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next function
+   */
+  async getAttendanceSummaryForPeriod(req, res, next) {
+    try {
+      const { periodId } = req.params;
+      
+      const result = await attendanceService.getAttendanceSummaryForPeriod(parseInt(periodId));
+
+      res.status(200).json({
+        success: true,
+        data: result.data,
+        request_id: req.id
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get all attendance periods (Admin only)
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next function
+   */
+  async getAllPeriods(req, res, next) {
+    try {
+      const { page, limit, isActive, payrollProcessed } = req.query;
+      
+      const options = {
+        page: page ? parseInt(page) : 1,
+        limit: limit ? parseInt(limit) : 20
+      };
+
+      // Parse boolean query parameters
+      if (isActive !== undefined) {
+        options.isActive = isActive === 'true';
+      }
+      if (payrollProcessed !== undefined) {
+        options.payrollProcessed = payrollProcessed === 'true';
+      }
+
+      const result = await attendanceService.getAllPeriods(options);
 
       res.status(200).json({
         success: true,
@@ -220,6 +335,7 @@ Object.getOwnPropertyNames(AttendanceController.prototype).forEach(method => {
 
 // Export individual methods for easier route binding
 module.exports = {
+  // Employee methods
   createPeriod: wrappedController.createPeriod,
   getActivePeriod: wrappedController.getActivePeriod,
   listPeriods: wrappedController.listPeriods,
@@ -228,6 +344,11 @@ module.exports = {
   getUserAttendanceInPeriod: wrappedController.getUserAttendanceInPeriod,
   getPeriodById: wrappedController.getPeriodById,
   calculateWorkingDays: wrappedController.calculateWorkingDays,
+  
+  // Admin methods
+  getAttendanceForPeriod: wrappedController.getAttendanceForPeriod,
+  getAttendanceSummaryForPeriod: wrappedController.getAttendanceSummaryForPeriod,
+  getAllPeriods: wrappedController.getAllPeriods,
   
   // Validation middleware for each endpoint
   validateCreatePeriod: validate(attendanceSchemas.period, 'body'),

@@ -492,13 +492,13 @@ router.put('/profile',
  * /api/v1/auth/logout:
  *   post:
  *     summary: User logout
- *     description: Log out the current user (for audit logging)
+ *     description: Logout user (invalidate session)
  *     tags: [Authentication]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Logged out successfully
+ *         description: Logout successful (or no-op if no token)
  *         content:
  *           application/json:
  *             schema:
@@ -512,19 +512,33 @@ router.put('/profile',
  *                   properties:
  *                     message:
  *                       type: string
- *                       example: "Logged out successfully"
+ *                       example: "Logout successful"
  *                 request_id:
  *                   type: string
  *       401:
- *         description: Authentication required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         description: Invalid token (optional, will still succeed)
  */
 router.post('/logout',
-  authenticateToken,
-  addUserContext,
+  (req, res, next) => {
+    // Try to authenticate but don't fail if no token
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (token) {
+      // If token exists, try to authenticate
+      authenticateToken(req, res, (err) => {
+        if (err) {
+          // If authentication fails, just proceed without user context
+          req.user = null;
+        }
+        next();
+      });
+    } else {
+      // No token provided, proceed as no-op
+      req.user = null;
+      next();
+    }
+  },
   authController.logout
 );
 

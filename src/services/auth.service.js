@@ -7,6 +7,8 @@ const logger = require('../utils/logger');
  * Business logic for user authentication and authorization
  */
 
+const AppError = require('../utils/errors');
+
 class AuthService {
   /**
    * Authenticate user with username and password
@@ -19,15 +21,15 @@ class AuthService {
     try {
       // Input validation
       if (!username || !password) {
-        throw new Error('Username and password are required');
+        throw new AppError('Username and password are required', 400, 'VALIDATION_ERROR');
       }
 
       if (username.length < 3 || username.length > 50) {
-        throw new Error('Username must be 3-50 characters');
+        throw new AppError('Username must be 3-50 characters', 400, 'VALIDATION_ERROR');
       }
 
       if (password.length < 6) {
-        throw new Error('Password must be at least 6 characters');
+        throw new AppError('Password must be at least 6 characters', 400, 'VALIDATION_ERROR');
       }
 
       // Find user
@@ -36,35 +38,18 @@ class AuthService {
         // Use same timing as successful validation to prevent timing attacks
         await hashPassword(password);
         
-        logger.auth('LOGIN_FAILED_USER_NOT_FOUND', requestContext, {
-          username,
-          reason: 'User not found'
-        });
-        
-        throw new Error('Invalid credentials');
+        throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
       }
 
       // Check if user is active
       if (!user.is_active) {
-        logger.auth('LOGIN_FAILED_USER_INACTIVE', requestContext, {
-          userId: user.id,
-          username,
-          reason: 'User account is inactive'
-        });
-        
-        throw new Error('User account is inactive');
+        throw new AppError('User account is inactive', 401, 'ACCOUNT_INACTIVE');
       }
 
       // Verify password
       const isValidPassword = await verifyPassword(password, user.password_hash);
       if (!isValidPassword) {
-        logger.auth('LOGIN_FAILED_INVALID_PASSWORD', requestContext, {
-          userId: user.id,
-          username,
-          reason: 'Invalid password'
-        });
-        
-        throw new Error('Invalid credentials');
+        throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
       }
 
       // Generate JWT token
@@ -95,12 +80,15 @@ class AuthService {
         }
       };
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       logger.auth('LOGIN_ERROR', requestContext, {
         username,
         error: error.message
       });
       
-      throw error;
+      throw new AppError('Login failed', 500, 'INTERNAL_ERROR');
     }
   }
 
@@ -128,23 +116,13 @@ class AuthService {
       // Check if username already exists
       const existingUsername = await userRepository.usernameExists(username);
       if (existingUsername) {
-        logger.auth('REGISTRATION_FAILED_USERNAME_EXISTS', requestContext, {
-          username,
-          reason: 'Username already exists'
-        });
-        
-        throw new Error('Username already exists');
+        throw new AppError('Username already exists', 409, 'USERNAME_EXISTS');
       }
 
       // Check if email already exists
       const existingEmail = await userRepository.emailExists(email);
       if (existingEmail) {
-        logger.auth('REGISTRATION_FAILED_EMAIL_EXISTS', requestContext, {
-          email,
-          reason: 'Email already exists'
-        });
-        
-        throw new Error('Email already exists');
+        throw new AppError('Email already exists', 409, 'EMAIL_EXISTS');
       }
 
       // Hash password
@@ -176,13 +154,16 @@ class AuthService {
         }
       };
     } catch (error) {
+      if (error.errorCode) {
+        throw error;
+      }
       logger.auth('REGISTRATION_ERROR', requestContext, {
         username: userData.username,
         email: userData.email,
         error: error.message
       });
       
-      throw error;
+      throw new AppError('Failed to register user', 500, 'INTERNAL_ERROR');
     }
   }
 
@@ -218,12 +199,7 @@ class AuthService {
       // Verify current password
       const isValidPassword = await verifyPassword(currentPassword, user.password_hash);
       if (!isValidPassword) {
-        logger.auth('PASSWORD_CHANGE_FAILED_INVALID_CURRENT', requestContext, {
-          userId,
-          reason: 'Invalid current password'
-        });
-        
-        throw new Error('Current password is incorrect');
+        throw new AppError('Current password is incorrect', 400, 'INVALID_CURRENT_PASSWORD');
       }
 
       // Hash new password
@@ -248,12 +224,15 @@ class AuthService {
         }
       };
     } catch (error) {
+      if (error.errorCode) {
+        throw error;
+      }
       logger.auth('PASSWORD_CHANGE_ERROR', requestContext, {
         userId,
         error: error.message
       });
       
-      throw error;
+      throw new AppError('Failed to change password', 500, 'INTERNAL_ERROR');
     }
   }
 

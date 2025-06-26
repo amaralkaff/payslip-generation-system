@@ -26,13 +26,13 @@ const baseSchemas = {
 // Authentication schemas
 const authSchemas = {
   register: Joi.object({
-    username: Joi.string().alphanum().min(3).max(30).required(),
+    username: Joi.string().pattern(/^[a-zA-Z0-9_]+$/).min(3).max(30).required(),
     email: baseSchemas.email,
     password: baseSchemas.password,
-    firstName: Joi.string().min(2).max(50).trim().required(),
-    lastName: Joi.string().min(2).max(50).trim().required(),
+    full_name: Joi.string().min(2).max(100).trim().required(),
     phone: baseSchemas.phone,
-    role: Joi.string().valid('admin', 'employee').default('employee')
+    role: Joi.string().valid('admin', 'employee').default('employee'),
+    salary: Joi.number().precision(2).min(0).required()
   }),
 
   login: Joi.object({
@@ -43,7 +43,7 @@ const authSchemas = {
   changePassword: Joi.object({
     currentPassword: Joi.string().required(),
     newPassword: baseSchemas.password,
-    confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required()
+    confirmPassword: Joi.string().valid(Joi.ref('newPassword')).optional()
   }),
 
   resetPassword: Joi.object({
@@ -56,7 +56,7 @@ const authSchemas = {
 // User schemas
 const userSchemas = {
   create: Joi.object({
-    username: Joi.string().alphanum().min(3).max(30).required(),
+    username: Joi.string().pattern(/^[a-zA-Z0-9_]+$/).min(3).max(30).required(),
     email: baseSchemas.email,
     password: baseSchemas.password,
     firstName: Joi.string().min(2).max(50).trim().required(),
@@ -93,16 +93,13 @@ const userSchemas = {
 const attendanceSchemas = {
   period: Joi.object({
     name: Joi.string().min(3).max(100).required(),
-    startDate: baseSchemas.date,
-    endDate: baseSchemas.date.greater(Joi.ref('startDate')),
+    start_date: baseSchemas.date,
+    end_date: baseSchemas.date.greater(Joi.ref('start_date')),
     description: Joi.string().max(500).optional()
   }),
 
   submission: Joi.object({
-    attendancePeriodId: baseSchemas.id,
-    checkInDate: baseSchemas.date,
-    checkInTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
-    checkOutTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+    attendance_date: baseSchemas.date,
     notes: Joi.string().max(500).optional()
   }),
 

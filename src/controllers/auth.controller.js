@@ -190,6 +190,17 @@ class AuthController {
    */
   async logout(req, res, next) {
     try {
+      // If no user context, treat as no-op success
+      if (!req.user || !req.user.id) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            message: 'Logout successful (no active session)'
+          },
+          request_id: req.id
+        });
+      }
+      
       const userId = req.user.id;
       
       // Create request context for logging

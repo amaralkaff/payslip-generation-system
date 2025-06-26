@@ -5,10 +5,14 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "start:minimal": "node src/server.minimal.js",
     "dev": "nodemon src/server.js",
+    "dev:minimal": "nodemon src/server.minimal.js",
     "test": "NODE_ENV=test jest",
     "test:unit": "NODE_ENV=test jest --testPathPattern=tests/unit",
-    "test:integration": "NODE_ENV=test jest --testPathPattern=tests/integration",
+    "test:integration": "NODE_ENV=test TZ=UTC jest --testPathPattern=tests/integration --runInBand",
+    "test:integration:auth": "NODE_ENV=test TZ=UTC jest --testPathPattern=tests/integration/auth --runInBand",
+    "test:integration:attendance": "NODE_ENV=test TZ=UTC jest --testPathPattern=tests/integration/attendance --runInBand",
     "test:e2e": "NODE_ENV=test jest --testPathPattern=tests/e2e",
     "test:watch": "NODE_ENV=test jest --watch",
     "test:coverage": "NODE_ENV=test jest --coverage",
@@ -37,35 +41,36 @@
   "author": "amaralkaff",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
-    "pg": "^8.11.3",
     "bcrypt": "^5.1.1",
-    "jsonwebtoken": "^9.0.2",
-    "joi": "^17.11.0",
-    "winston": "^3.11.0",
-    "helmet": "^7.1.0",
-    "cors": "^2.8.5",
-    "express-rate-limit": "^7.1.5",
     "compression": "^1.7.4",
-    "dotenv": "^16.3.1",
-    "uuid": "^9.0.1",
+    "cors": "^2.8.5",
     "date-fns": "^2.30.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "pg": "^8.11.3",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.0"
+    "swagger-ui-express": "^5.0.0",
+    "uuid": "^9.0.1",
+    "winston": "^3.11.0"
   },
   "devDependencies": {
-    "jest": "^29.7.0",
-    "supertest": "^6.3.3",
-    "nodemon": "^3.0.2",
+    "@faker-js/faker": "^9.8.0",
+    "@types/jest": "^29.5.8",
     "eslint": "^8.55.0",
     "eslint-config-standard": "^17.1.0",
     "eslint-plugin-jest": "^27.6.0",
     "eslint-plugin-node": "^11.1.0",
-    "@types/jest": "^29.5.8",
     "husky": "^8.0.3",
-    "lint-staged": "^15.2.0"
+    "jest": "^29.7.0",
+    "lint-staged": "^15.2.0",
+    "nodemon": "^3.0.2",
+    "supertest": "^6.3.3"
   },
   "engines": {
     "node": ">=18.0.0",
@@ -77,7 +82,9 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ],
     "testMatch": [
       "**/tests/**/*.test.js"
     ],
@@ -88,7 +95,11 @@
       "!src/server.js"
     ],
     "coverageDirectory": "coverage",
-    "coverageReporters": ["text", "lcov", "html"],
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ],
     "testTimeout": 10000,
     "maxWorkers": "50%"
   },
@@ -98,4 +109,4 @@
       "jest --bail --findRelatedTests"
     ]
   }
-} 
+}

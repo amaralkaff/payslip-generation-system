@@ -303,3 +303,5 @@ generated/
 *.claude-log
 *.copilot-log
 conversation-*.md
+TESTING.md
+MINIMAL-API.md

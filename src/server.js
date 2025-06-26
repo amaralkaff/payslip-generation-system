@@ -52,43 +52,49 @@ app.use(cors({
 }));
 
 // Rate limiting
-const generalLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-  message: {
-    error: 'Too many requests from this IP, please try again later.',
-    retryAfter: '15 minutes'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    logger.warn('Rate limit exceeded', {
-      ip: req.ip,
-      userAgent: req.get('User-Agent'),
-      url: req.originalUrl
-    });
-    res.status(429).json({
-      success: false,
-      error: {
-        code: 'RATE_LIMIT_EXCEEDED',
-        message: 'Too many requests from this IP, please try again later.'
-      }
-    });
-  }
-});
+if (process.env.RATE_LIMIT_ENABLED !== 'false') {
+  const generalLimiter = rateLimit({
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    message: {
+      error: 'Too many requests from this IP, please try again later.',
+      retryAfter: '15 minutes'
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      logger.warn('Rate limit exceeded', {
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        url: req.originalUrl
+      });
+      res.status(429).json({
+        success: false,
+        error: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Too many requests from this IP, please try again later.'
+        }
+      });
+    }
+  });
 
-// Auth rate limiting (more restrictive)
-const authLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_AUTH_MAX_REQUESTS) || 10,
-  message: {
-    error: 'Too many authentication attempts, please try again later.',
-    retryAfter: '15 minutes'
-  }
-});
+  // Auth rate limiting (more restrictive)
+  const authLimiter = rateLimit({
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_AUTH_MAX_REQUESTS) || 10,
+    message: {
+      error: 'Too many authentication attempts, please try again later.',
+      retryAfter: '15 minutes'
+    }
+  });
 
-app.use(generalLimiter);
-app.use('/api/auth', authLimiter);
+  app.use(generalLimiter);
+  app.use('/api/auth', authLimiter);
+  
+  logger.info('Rate limiting enabled');
+} else {
+  logger.info('Rate limiting disabled');
+}
 
 /**
  * Performance Middleware
@@ -195,7 +201,12 @@ if (process.env.API_DOCS_ENABLED === 'true' && process.env.NODE_ENV !== 'product
     },
     apis: [
       './src/server.js',
-      './src/routes/auth.routes.js'
+      './src/routes/auth.routes.js',
+      './src/routes/user.routes.js',
+      './src/routes/attendance.routes.js',
+      './src/routes/overtime.routes.js',
+      './src/routes/reimbursement.routes.js',
+      './src/routes/payroll.routes.js'
     ]
   };
   
@@ -335,36 +346,26 @@ app.use('*', (req, res) => {
   });
 });
 
+const AppError = require('./utils/errors');
+
 // Global error handler
 app.use((err, req, res, next) => {
-  let statusCode = err.statusCode || err.status || 500;
+  let statusCode = err.statusCode || 500;
   let message = err.message || 'Internal Server Error';
-  let errorCode = err.code || 'INTERNAL_ERROR';
-  
-  // Handle specific error types
-  if (err.name === 'ValidationError') {
+  let errorCode = err.errorCode || 'INTERNAL_ERROR';
+
+  if (err instanceof AppError) {
+    statusCode = err.statusCode;
+    message = err.message;
+    errorCode = err.errorCode;
+  } else if (err.name === 'ValidationError') {
     statusCode = 400;
     errorCode = 'VALIDATION_ERROR';
   } else if (err.name === 'UnauthorizedError') {
     statusCode = 401;
     errorCode = 'UNAUTHORIZED';
-  } else if (err.message === 'Invalid credentials') {
-    statusCode = 401;
-    errorCode = 'INVALID_CREDENTIALS';
-  } else if (err.message === 'User account is inactive') {
-    statusCode = 401;
-    errorCode = 'ACCOUNT_INACTIVE';
-  } else if (err.message === 'Username already exists') {
-    statusCode = 400;
-    errorCode = 'USERNAME_EXISTS';
-  } else if (err.message === 'Email already exists') {
-    statusCode = 400;
-    errorCode = 'EMAIL_EXISTS';
-  } else if (err.message === 'User not found') {
-    statusCode = 404;
-    errorCode = 'USER_NOT_FOUND';
   }
-  
+
   // Log error with full context
   logger.error('Request failed', {
     error: message,
@@ -378,24 +379,24 @@ app.use((err, req, res, next) => {
     ip: req.ip,
     userAgent: req.get('User-Agent')
   });
-  
+
   // Don't expose internal errors in production
   const response = {
     success: false,
     error: {
       code: errorCode,
-      message: process.env.NODE_ENV === 'production' && statusCode === 500 
-        ? 'Internal Server Error' 
+      message: process.env.NODE_ENV === 'production' && statusCode === 500
+        ? 'Internal Server Error'
         : message
     },
     request_id: req.id
   };
-  
+
   // Add stack trace in development
   if (process.env.NODE_ENV === 'development') {
     response.error.stack = err.stack;
   }
-  
+
   res.status(statusCode).json(response);
 });
 

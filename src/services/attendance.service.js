@@ -2,6 +2,7 @@ const attendanceRepository = require('../repositories/attendance.repository');
 const userRepository = require('../repositories/user.repository');
 const logger = require('../utils/logger');
 const { customValidators } = require('../utils/validation');
+const AppError = require('../utils/errors');
 
 /**
  * Attendance Service
@@ -22,16 +23,28 @@ class AttendanceService {
 
       // Validate dates
       if (new Date(end_date) <= new Date(start_date)) {
-        throw new Error('End date must be after start date');
+        throw new AppError('End date must be after start date', 400, 'VALIDATION_ERROR');
       }
 
-      // Check if there's already an active period
+      // Check for overlapping periods
+      const overlappingPeriod = await attendanceRepository.findOverlappingPeriod(start_date, end_date);
+      if (overlappingPeriod) {
+        throw new AppError(
+          `Attendance period overlaps with existing period "${overlappingPeriod.name}" (${overlappingPeriod.start_date} to ${overlappingPeriod.end_date})`, 
+          409, 
+          'PERIOD_OVERLAP'
+        );
+      }
+
+      // Get current active period to deactivate if creating a new one
       const activePeriod = await attendanceRepository.getActivePeriod();
+
+      // If there's an active period, reject creation
       if (activePeriod) {
-        throw new Error('There is already an active attendance period');
+        throw new AppError('There is already an active attendance period', 409, 'ACTIVE_PERIOD_EXISTS');
       }
 
-      // Create the period
+      // Create the new period (it will be active by default)
       const period = await attendanceRepository.createPeriod({
         name,
         start_date,
@@ -121,35 +134,47 @@ class AttendanceService {
     try {
       const { attendance_date, notes } = attendanceData;
 
+      // Validate attendance_date is a valid date string
+      if (isNaN(new Date(attendance_date).getTime())) {
+        throw new AppError('Invalid attendance date format', 400, 'VALIDATION_ERROR');
+      }
+
       // Get active attendance period
       const activePeriod = await attendanceRepository.getActivePeriod();
       if (!activePeriod) {
-        throw new Error('No active attendance period found');
+        throw new AppError('No active attendance period found', 400, 'NO_ACTIVE_PERIOD');
       }
 
       // Check if period is already processed
       if (activePeriod.payroll_processed) {
-        throw new Error('Cannot submit attendance for a processed period');
+        throw new AppError('Cannot submit attendance for a processed period', 400, 'PERIOD_PROCESSED');
+      }
+
+      // Validate not future date first
+      const attendanceDate = new Date(attendance_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (attendanceDate > today) {
+        throw new AppError('Cannot submit attendance for future dates', 400, 'FUTURE_DATE_NOT_ALLOWED');
       }
 
       // Validate date is within the period
-      const attendanceDate = new Date(attendance_date);
       const startDate = new Date(activePeriod.start_date);
       const endDate = new Date(activePeriod.end_date);
 
       if (attendanceDate < startDate || attendanceDate > endDate) {
-        throw new Error('Attendance date must be within the active period');
+        throw new AppError('Attendance date must be within the active period', 400, 'DATE_OUTSIDE_PERIOD');
       }
 
       // Validate it's a working day (Monday-Friday)
       if (!customValidators.isWorkingDay(attendance_date)) {
-        throw new Error('Cannot submit attendance for weekends');
+        throw new AppError('Cannot submit attendance for weekends', 400, 'WEEKEND_NOT_ALLOWED');
       }
 
       // Check if attendance already exists for this date
       const exists = await attendanceRepository.attendanceExistsForDate(userId, attendance_date);
       if (exists) {
-        throw new Error('Attendance already submitted for this date');
+        throw new AppError('Attendance already submitted for this date', 400, 'ATTENDANCE_ALREADY_EXISTS');
       }
 
       // Submit attendance
@@ -173,13 +198,16 @@ class AttendanceService {
         data: attendance
       };
     } catch (error) {
+      if (error.errorCode) {
+        throw error;
+      }
       logger.error('Failed to submit attendance', {
         attendanceData,
         userId,
         error: error.message,
         requestContext
       });
-      throw error;
+      throw new AppError('Failed to submit attendance', 500, 'INTERNAL_ERROR');
     }
   }
 
@@ -242,7 +270,7 @@ class AttendanceService {
     try {
       const period = await attendanceRepository.getPeriodById(periodId);
       if (!period) {
-        throw new Error('Attendance period not found');
+        throw new AppError('Attendance period not found', 404, 'PERIOD_NOT_FOUND');
       }
 
       const attendance = await attendanceRepository.getUserAttendanceInPeriod(userId, periodId);
@@ -282,7 +310,7 @@ class AttendanceService {
     try {
       const period = await attendanceRepository.getPeriodById(periodId);
       if (!period) {
-        throw new Error('Attendance period not found');
+        throw new AppError('Attendance period not found', 404, 'PERIOD_NOT_FOUND');
       }
 
       return {
@@ -325,6 +353,150 @@ class AttendanceService {
       throw error;
     }
   }
+
+  // ===== ADMIN METHODS =====
+
+  /**
+   * Get all attendance records for a period (Admin view)
+   * @param {number} periodId - Attendance period ID
+   * @param {Object} options - Query options (pagination, userId filter)
+   * @returns {Promise<Object>} Service result
+   */
+  async getAttendanceForPeriod(periodId, options = {}) {
+    try {
+      // Validate period exists
+      const period = await attendanceRepository.getPeriodById(periodId);
+      if (!period) {
+        throw new AppError('Attendance period not found', 404, 'PERIOD_NOT_FOUND');
+      }
+
+      const result = await attendanceRepository.getAttendanceForPeriod(periodId, options);
+      
+      return {
+        success: true,
+        data: {
+          period: {
+            id: period.id,
+            name: period.name,
+            start_date: period.start_date,
+            end_date: period.end_date,
+            is_active: period.is_active,
+            payroll_processed: period.payroll_processed
+          },
+          attendance: result.data,
+          pagination: result.pagination
+        }
+      };
+    } catch (error) {
+      logger.error('Failed to get attendance for period (admin)', {
+        periodId,
+        options,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get attendance summary for a period (Admin view)
+   * @param {number} periodId - Attendance period ID
+   * @returns {Promise<Object>} Service result
+   */
+  async getAttendanceSummaryForPeriod(periodId) {
+    try {
+      const summary = await attendanceRepository.getAttendanceSummaryForPeriod(periodId);
+      
+      // Ensure numeric fields are properly typed
+      const processedSummary = {
+        ...summary,
+        total_working_days: parseInt(summary.total_working_days),
+        employees_with_attendance: parseInt(summary.employees_with_attendance),
+        total_attendance_records: parseInt(summary.total_attendance_records),
+        total_employees: parseInt(summary.total_employees)
+      };
+      
+      return {
+        success: true,
+        data: processedSummary
+      };
+    } catch (error) {
+      if (error.message === 'Attendance period not found') {
+        error.statusCode = 404;
+        error.code = 'PERIOD_NOT_FOUND';
+      }
+      
+      logger.error('Failed to get attendance summary for period (admin)', {
+        periodId,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get all attendance periods (Admin view)
+   * @param {Object} options - Query options (pagination, filters)
+   * @returns {Promise<Object>} Service result
+   */
+  async getAllPeriods(options = {}) {
+    try {
+      const result = await attendanceRepository.getAllPeriods(options);
+      
+      return {
+        success: true,
+        data: {
+          periods: result.data,
+          pagination: result.pagination
+        }
+      };
+    } catch (error) {
+      logger.error('Failed to get all attendance periods (admin)', {
+        options,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Check if date is a weekday (Monday-Friday)
+   * @param {string} dateString - Date in YYYY-MM-DD format
+   * @returns {boolean} True if weekday
+   */
+  static isWeekday(dateString) {
+    const date = new Date(dateString);
+    const dayOfWeek = date.getDay();
+    return dayOfWeek >= 1 && dayOfWeek <= 5; // Monday = 1, Friday = 5
+  }
+
+  /**
+   * Check if date is within range
+   * @param {string} dateString - Date to check
+   * @param {string} startDate - Range start date
+   * @param {string} endDate - Range end date
+   * @returns {boolean} True if in range
+   */
+  static isDateInRange(dateString, startDate, endDate) {
+    const date = new Date(dateString);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return date >= start && date <= end;
+  }
+
+  /**
+   * Check if date is in the future
+   * @param {string} dateString - Date in YYYY-MM-DD format
+   * @returns {boolean} True if future date
+   */
+  static isFutureDate(dateString) {
+    const date = new Date(dateString);
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    date.setUTCHours(0, 0, 0, 0);
+    return date > today;
+  }
 }
 
-module.exports = new AttendanceService(); 
+const attendanceServiceInstance = new AttendanceService();
+attendanceServiceInstance.AttendanceService = AttendanceService; // Expose class for static methods
+module.exports = attendanceServiceInstance; 
