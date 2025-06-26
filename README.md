@@ -38,12 +38,6 @@ open http://localhost:3000/api-docs
 5. **Enter token**: Type `Bearer <your-jwt-token>` (include "Bearer " prefix)
 6. **Test APIs**: All endpoints now have **auto-placeholder values** - just click "Execute"!
 
-**✨ Enhanced Features:**
-- **Auto-filled forms**: All request bodies pre-populated with realistic data
-- **Multiple examples**: Choose from different scenarios (Admin/Employee login, Travel/Meals reimbursement)
-- **Smart defaults**: Dates automatically set for July 2025 period
-- **One-click testing**: No manual typing needed - just click "Execute"
-
 **Step-by-step Authorization:**
 ```
 1. POST /api/v1/auth/login → Auto-filled with admin/admin123
