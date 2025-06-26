@@ -34,7 +34,7 @@ open http://localhost:3000/api-docs
 1. **Open Swagger**: http://localhost:3000/api-docs
 2. **Login first**: Use POST `/api/v1/auth/login` with auto-filled demo credentials
 3. **Get JWT token**: Copy the `token` from login response
-4. **Authorize**: Click 🔒 **"Authorize"** button at top right
+4. **Authorize**: Click **"Authorize"** button at top right
 5. **Enter token**: Type `Bearer <your-jwt-token>` (include "Bearer " prefix)
 6. **Test APIs**: All endpoints now have **auto-placeholder values** - just click "Execute"!
 
